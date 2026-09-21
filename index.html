@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bright Paper Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   BRIGHT PAPER — PORTAL APP (wrapper)
+
+   Ye file portal NAHI hai. Portal wahi Apps Script wala hai, isi ke
+   andar khulta hai. Is file ka ek hi kaam hai: notification dikhana.
+
+   Kyun alag file? Apps Script ka page ek iframe me chalta hai, aur
+   Chrome/Firefox aise iframe ko notification ki ijazat maangne hi nahi
+   dete. Ye file apne asli pate (github.io) par chalti hai, isliye
+   ijazat maang sakti hai. Portal postMessage se batata hai "ye naya
+   aaya", aur ye file notification dikha deti hai.
+   ═══════════════════════════════════════════════════════════════════ */
+html,body{margin:0;height:100%;background:#F4F5F9;overflow:hidden;
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+#app{position:fixed;left:0;right:0;bottom:0;top:0;width:100%;height:100%;border:0;
+  background:#F4F5F9}
+body.ask #app{top:52px;height:calc(100% - 52px)}
+
+/* Upar ki patli patti — sirf tab jab ijazat abhi maangi nahi */
+#bar{display:none;position:fixed;left:0;right:0;top:0;height:52px;z-index:5;
+  align-items:center;gap:10px;padding:0 12px 0 14px;box-sizing:border-box;
+  background:#FFF2EA;border-bottom:1px solid #FFD4BC;color:#5A2A0C;font-size:13.5px}
+body.ask #bar{display:flex}
+#bar span{flex:1;min-width:0;line-height:1.3}
+#bar b{color:#A63E11}
+#bar button{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:8px 14px;
+  cursor:pointer;white-space:nowrap}
+#on{color:#fff;background:#F26522;border:1px solid #F26522}
+#later{color:#7A4A2C;background:transparent;border:1px solid transparent}
+
+/* URL abhi bhara nahi */
+#setup{display:none;max-width:560px;margin:60px auto;padding:24px;background:#fff;
+  border:1px solid #E6E8EF;border-radius:14px;color:#394154;font-size:14px;line-height:1.6}
+#setup code{background:#F4F5F9;border:1px solid #E6E8EF;border-radius:5px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div id="bar">
+  <span><b>Notification chalu karein</b> &mdash; chutti, ticket, janamdin ki har khabar
+    seedha aapke phone / computer par.</span>
+  <button id="on" type="button">Chalu karein</button>
+  <button id="later" type="button">Baad me</button>
+</div>
+<iframe id="app" title="Bright Paper Portal" allow="clipboard-write"></iframe>
+<div id="setup">
+  <h3 style="margin-top:0">Portal ka pata abhi bhara nahi</h3>
+  Is file (<code>index.html</code>) me upar <code>PORTAL</code> ki jagah apna Apps Script
+  web app ka <code>/exec</code> wala URL daalein.
+</div>
+
+<script>
+/* ── YAHAN APNA URL ──────────────────────────────────────────────────
+   Apps Script > Deploy > Manage deployments > Web app ka URL.
+   /exec par khatam hona chahiye.                                     */
+var PORTAL = 'https://script.google.com/macros/s/PASTE_YOUR_DEPLOYMENT_ID/exec';
+
+(function () {
+  var frame = document.getElementById('app');
+  var pWin = null, pOrigin = '', reg = null;
+  var hashNav = (location.hash || '').replace('#', '');
+
+  if (/PASTE_YOUR/.test(PORTAL)) {
+    frame.style.display = 'none';
+    document.getElementById('setup').style.display = 'block';
+    return;
+  }
+  frame.src = PORTAL;
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(function (r) { reg = r; }).catch(function () {});
+    /* notification par click -> service worker -> yahan -> portal */
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      var d = e.data || {};
+      if (d.bp === 'open') { window.focus(); tell({ bp: 'open', nav: d.nav || '' }); }
+    });
+  }
+
+  function perm() { return ('Notification' in window) ? Notification.permission : 'unsupported'; }
+  function tell(m) { if (pWin) try { pWin.postMessage(m, pOrigin); } catch (e) {} }
+
+  /* Patti tabhi, jab ijazat abhi maangi nahi aur "Baad me" aaj nahi dabaya */
+  function bar() {
+    var snooze = 0;
+    try { snooze = Number(localStorage.getItem('bp-later') || 0); } catch (e) {}
+    var show = perm() === 'default' && Date.now() - snooze > 20 * 3600 * 1000;
+    document.body.classList.toggle('ask', show);
+  }
+
+  function badge(n) {
+    try {
+      if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n);
+      else if (navigator.clearAppBadge) navigator.clearAppBadge();
+    } catch (e) {}
+  }
+
+  function show(list) {
+    if (perm() !== 'granted' || !list || !list.length) return;
+    list.slice(0, 6).forEach(function (x) {
+      var opt = { body: x.body || '', icon: 'icon-192.png', badge: 'icon-192.png',
+                  tag: x.tag || undefined, renotify: !!x.tag, data: { nav: x.nav || '' } };
+      if (reg && reg.showNotification) { reg.showNotification(x.title || 'Bright Paper', opt); return; }
+      try {                                   /* purana browser, bina service worker */
+        var n = new Notification(x.title || 'Bright Paper', opt);
+        n.onclick = function () { window.focus(); tell({ bp: 'open', nav: x.nav || '' }); n.close(); };
+      } catch (e) {}
+    });
+  }
+
+  /* Sirf portal ki baat suno — googleusercontent se aane wali */
+  window.addEventListener('message', function (e) {
+    var host = '';
+    try { host = new URL(e.origin).hostname; } catch (x) {}
+    if (!/\.googleusercontent\.com$/.test(host)) return;
+    var d = e.data || {};
+    if (!d.bp) return;
+    pWin = e.source; pOrigin = e.origin;
+
+    if (d.bp === 'hello') {
+      tell({ bp: 'wrap', perm: perm() });
+      bar();
+      if (hashNav) { tell({ bp: 'open', nav: hashNav }); hashNav = ''; history.replaceState(null, '', './'); }
+    }
+    if (d.bp === 'notify') { badge(d.badge || 0); show(d.list); }
+    if (d.bp === 'badge')  badge(d.n || 0);
+  });
+
+  document.getElementById('on').onclick = function () {
+    if (!('Notification' in window)) { alert('Is browser me notification nahi chalti.'); return; }
+    Notification.requestPermission().then(function (p) {
+      tell({ bp: 'perm', perm: p });
+      bar();
+      if (p === 'granted') show([{ title: 'Notification chalu ho gayi',
+        body: 'Portal ki nayi khabar ab yahan aayegi.', tag: 'bp-hello' }]);
+    });
+  };
+  document.getElementById('later').onclick = function () {
+    try { localStorage.setItem('bp-later', String(Date.now())); } catch (e) {}
+    bar();
+  };
+})();
+</script>
+</body>
+</html>
