@@ -47,23 +47,23 @@ body.ask #bar{display:flex}
 </head>
 <body>
 <div id="bar">
-  <span><b>Notification chalu karein</b> &mdash; chutti, ticket, janamdin ki har khabar
-    seedha aapke phone / computer par.</span>
-  <button id="on" type="button">Chalu karein</button>
-  <button id="later" type="button">Baad me</button>
+  <span><b>Turn on notifications</b> &mdash; get every leave, ticket and birthday
+    update straight on your phone or computer.</span>
+  <button id="on" type="button">Turn on</button>
+  <button id="later" type="button">Later</button>
 </div>
 <iframe id="app" title="Bright Paper Portal" allow="clipboard-write"></iframe>
 <div id="setup">
-  <h3 style="margin-top:0">Portal ka pata abhi bhara nahi</h3>
-  Is file (<code>index.html</code>) me upar <code>PORTAL</code> ki jagah apna Apps Script
-  web app ka <code>/exec</code> wala URL daalein.
+  <h3 style="margin-top:0">The portal address is not set yet</h3>
+  In this file (<code>index.html</code>), replace <code>PORTAL</code> near the top with
+  your Apps Script web app's <code>/exec</code> URL.
 </div>
 
 <script>
 /* ── YAHAN APNA URL ──────────────────────────────────────────────────
    Apps Script > Deploy > Manage deployments > Web app ka URL.
    /exec par khatam hona chahiye.                                     */
-var PORTAL = 'https://script.google.com/a/macros/brightpaper.co.in/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
+var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
 
 (function () {
   var frame = document.getElementById('app');
@@ -136,12 +136,12 @@ var PORTAL = 'https://script.google.com/a/macros/brightpaper.co.in/s/AKfycbxu5yL
   });
 
   document.getElementById('on').onclick = function () {
-    if (!('Notification' in window)) { alert('Is browser me notification nahi chalti.'); return; }
+    if (!('Notification' in window)) { alert('This browser does not support notifications.'); return; }
     Notification.requestPermission().then(function (p) {
       tell({ bp: 'perm', perm: p });
       bar();
-      if (p === 'granted') show([{ title: 'Notification chalu ho gayi',
-        body: 'Portal ki nayi khabar ab yahan aayegi.', tag: 'bp-hello' }]);
+      if (p === 'granted') show([{ title: 'Notifications are on',
+        body: 'New portal updates will appear here.', tag: 'bp-hello' }]);
     });
   };
   document.getElementById('later').onclick = function () {
