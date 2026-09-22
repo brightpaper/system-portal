@@ -56,8 +56,8 @@ body.ask #bar{display:flex}
 <div id="setup">
   <h3 style="margin-top:0">The portal address is not set yet</h3>
   In this file (<code>index.html</code>), replace <code>PORTAL</code> near the top with
-  your Apps Script web app's <code>/exec</code> URL, in the company form
-  (<code>/a/macros/brightpaper.co.in/s/&hellip;/exec</code>).
+  your Apps Script web app's <code>/exec</code> URL, in the plain form
+  (<code>https://script.google.com/macros/s/&hellip;/exec</code>).
 </div>
 
 <!-- Firebase: sirf push ke liye. Na mile (net band) to app pehle jaisi chalti hai. -->
@@ -68,15 +68,17 @@ body.ask #bar{display:flex}
    Apps Script > Deploy > Manage deployments > Web app ka URL.
    /exec par khatam hona chahiye.
 
-   COMPANY WALA ROOP: .../a/macros/brightpaper.co.in/s/ID/exec
-   Portal ka access "Anyone within brightpaper" hai. Bina company ke naam
-   ke (.../macros/s/ID/exec), jis browser me do Google account login hon
-   (company + personal), Google PEHLE account se kholta hai — wo personal
-   ho to "Sorry, unable to open the file" aata hai. Rashmi ke PC par yahi
-   hota tha; company wala link wahan khul gaya.
+   YAHAN HAMESHA SEEDHA ROOP:  https://script.google.com/macros/s/ID/exec
+   Company wala roop (.../a/macros/brightpaper.co.in/s/ID/exec) yahan
+   KABHI NAHI. Ye app portal ko apne andar (iframe me) kholti hai, aur us
+   roop par Google page ko doosri site ke andar dikhne nahi deta —
+   console me "X-Frame-Options: sameorigin" aata hai aur sabki app band
+   ho jaati hai. (22 Sep ko yahi hua tha.)
 
-   Portal ki Code.gs me PORTAL_URL bhi yahi hai — ID badle to dono jagah. */
-var PORTAL = 'https://script.google.com/a/macros/brightpaper.co.in/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
+   Company wala roop sirf browser tab me khulne wale links ke liye hai —
+   portal ki Code.gs me PORTAL_URL. ID dono jagah ek hi hai; nayi
+   deployment bane to dono jagah ID badlo, roop wahi rehne do.       */
+var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
 
 /* ── Firebase (public cheezein — inme koi raaz nahi) ───────────────── */
 var FB = {
@@ -92,7 +94,7 @@ var FB = {
 var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqFO7Pk6vGimSKCDTOQkYyw';
 
 /* Is app ka version — portal ke "Test notifications" page par dikhta hai */
-var WRAP_VER = '22Sep-04';
+var WRAP_VER = '22Sep-05';
 
 (function () {
   var frame = document.getElementById('app');
