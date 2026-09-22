@@ -59,14 +59,31 @@ body.ask #bar{display:flex}
   your Apps Script web app's <code>/exec</code> URL.
 </div>
 
+<!-- Firebase: sirf push ke liye. Na mile (net band) to app pehle jaisi chalti hai. -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script>
 /* ── YAHAN APNA URL ──────────────────────────────────────────────────
    Apps Script > Deploy > Manage deployments > Web app ka URL.
    /exec par khatam hona chahiye.                                     */
 var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
 
+/* ── Firebase (public cheezein — inme koi raaz nahi) ───────────────── */
+var FB = {
+  apiKey: 'AIzaSyBl--envqRSsVmG86HhpGoByoK7Gf3XM5o',
+  authDomain: 'system-portal-c6b67.firebaseapp.com',
+  projectId: 'system-portal-c6b67',
+  storageBucket: 'system-portal-c6b67.firebasestorage.app',
+  messagingSenderId: '349426254052',
+  appId: '1:349426254052:web:ee2487e822d5984434acf1'
+};
+/* Firebase > Project settings > Cloud Messaging > Web Push certificates
+   wali lambi key. Jab tak ye nahi bhari, app push ke bina chalti rahegi. */
+var VAPID = 'PASTE_WEB_PUSH_KEY_HERE';
+
 (function () {
   var frame = document.getElementById('app');
+  var fcmToken = '', msg = null;
   var pWin = null, pOrigin = '', reg = null;
   var hashNav = (location.hash || '').replace('#', '');
 
@@ -78,7 +95,7 @@ var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-
   frame.src = PORTAL;
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(function (r) { reg = r; }).catch(function () {});
+    navigator.serviceWorker.register('sw.js').then(function (r) { reg = r; getFcm(); }).catch(function () {});
     /* notification par click -> service worker -> yahan -> portal */
     navigator.serviceWorker.addEventListener('message', function (e) {
       var d = e.data || {};
@@ -88,6 +105,33 @@ var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-
 
   function perm() { return ('Notification' in window) ? Notification.permission : 'unsupported'; }
   function tell(m) { if (pWin) try { pWin.postMessage(m, pOrigin); } catch (e) {} }
+
+  /* ── Asli push: is device ka Firebase token ──
+     Ijazat mil chuki ho aur key bhari ho tabhi. Token portal ko jaata hai,
+     portal use server par is insaan ke naam likh deta hai. Token pehle
+     mil jaye aur portal baad me aaye, to "hello" par bhej dete hain.   */
+  function getFcm() {
+    if (fcmToken || !reg || perm() !== 'granted' || /PASTE_/.test(VAPID)) return;
+    if (typeof firebase === 'undefined' || !firebase.messaging) return;
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(FB);
+      var sup = firebase.messaging.isSupported();
+      if (sup === false) return;                       // purana browser / iPhone bina Home Screen
+      msg = msg || firebase.messaging();
+      /* app saamne khuli ho tab Firebase notification khud nahi dikhata \u2014
+         hum dikhate hain, taaki har haal me ek jaisi aaye */
+      if (!msg._bp) {
+        msg._bp = true;
+        msg.onMessage(function (p) {
+          var d = (p && p.data) || {};
+          show([{ title: d.title, body: d.body, tag: d.tag, nav: d.nav }]);
+        });
+      }
+      msg.getToken({ vapidKey: VAPID, serviceWorkerRegistration: reg })
+        .then(function (t) { if (t) { fcmToken = t; tell({ bp: 'fcm', token: t }); } })
+        .catch(function (e) { console.log('FCM token nahi mila:', e); });
+    } catch (e) { console.log('FCM:', e); }
+  }
 
   /* Patti tabhi, jab ijazat abhi maangi nahi aur "Baad me" aaj nahi dabaya */
   function bar() {
@@ -128,6 +172,7 @@ var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-
 
     if (d.bp === 'hello') {
       tell({ bp: 'wrap', perm: perm() });
+      if (fcmToken) tell({ bp: 'fcm', token: fcmToken }); else getFcm();
       bar();
       if (hashNav) { tell({ bp: 'open', nav: hashNav }); hashNav = ''; history.replaceState(null, '', './'); }
     }
@@ -140,6 +185,7 @@ var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-
     Notification.requestPermission().then(function (p) {
       tell({ bp: 'perm', perm: p });
       bar();
+      if (p === 'granted') getFcm();
       if (p === 'granted') show([{ title: 'Notifications are on',
         body: 'New portal updates will appear here.', tag: 'bp-hello' }]);
     });
