@@ -56,7 +56,8 @@ body.ask #bar{display:flex}
 <div id="setup">
   <h3 style="margin-top:0">The portal address is not set yet</h3>
   In this file (<code>index.html</code>), replace <code>PORTAL</code> near the top with
-  your Apps Script web app's <code>/exec</code> URL.
+  your Apps Script web app's <code>/exec</code> URL, in the company form
+  (<code>/a/macros/brightpaper.co.in/s/&hellip;/exec</code>).
 </div>
 
 <!-- Firebase: sirf push ke liye. Na mile (net band) to app pehle jaisi chalti hai. -->
@@ -65,8 +66,17 @@ body.ask #bar{display:flex}
 <script>
 /* ── YAHAN APNA URL ──────────────────────────────────────────────────
    Apps Script > Deploy > Manage deployments > Web app ka URL.
-   /exec par khatam hona chahiye.                                     */
-var PORTAL = 'https://script.google.com/macros/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
+   /exec par khatam hona chahiye.
+
+   COMPANY WALA ROOP: .../a/macros/brightpaper.co.in/s/ID/exec
+   Portal ka access "Anyone within brightpaper" hai. Bina company ke naam
+   ke (.../macros/s/ID/exec), jis browser me do Google account login hon
+   (company + personal), Google PEHLE account se kholta hai — wo personal
+   ho to "Sorry, unable to open the file" aata hai. Rashmi ke PC par yahi
+   hota tha; company wala link wahan khul gaya.
+
+   Portal ki Code.gs me PORTAL_URL bhi yahi hai — ID badle to dono jagah. */
+var PORTAL = 'https://script.google.com/a/macros/brightpaper.co.in/s/AKfycbxu5yLXD5ylfv8M1rb6g1c2SZ-dcKjlole4x2UYO4DeWMqKpVD103L4pHRmhsFl5TsnGQ/exec';
 
 /* ── Firebase (public cheezein — inme koi raaz nahi) ───────────────── */
 var FB = {
@@ -81,9 +91,13 @@ var FB = {
    wali lambi key. Jab tak ye nahi bhari, app push ke bina chalti rahegi. */
 var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqFO7Pk6vGimSKCDTOQkYyw';
 
+/* Is app ka version — portal ke "Test notifications" page par dikhta hai */
+var WRAP_VER = '22Sep-04';
+
 (function () {
   var frame = document.getElementById('app');
   var fcmToken = '', msg = null;
+  var pushAt = 0, fcmErr = '';     // aakhri push kab aaya / token kyun nahi mila
   var pWin = null, pOrigin = '', reg = null;
   var hashNav = (location.hash || '').replace('#', '');
 
@@ -95,13 +109,35 @@ var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqF
   frame.src = PORTAL;
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(function (r) { reg = r; getFcm(); }).catch(function () {});
-    /* notification par click -> service worker -> yahan -> portal */
+    navigator.serviceWorker.register('sw.js').then(function (r) { reg = r; getFcm(); })
+      .catch(function (e) { fail('Service worker: ' + ((e && e.message) || e)); });
+    /* notification par click -> service worker -> yahan -> portal
+       push aaya (app khuli thi)  -> service worker -> yahan -> portal */
     navigator.serviceWorker.addEventListener('message', function (e) {
       var d = e.data || {};
       if (d.bp === 'open') { window.focus(); tell({ bp: 'open', nav: d.nav || '' }); }
+      if (d.bp === 'got')  { pushAt = Number(d.at) || Date.now(); tell({ bp: 'pushok', at: pushAt }); }
     });
+  } else fail('This browser has no service worker support');
+
+  /* Pichhla saboot — is device par aakhri push kab pahuncha tha */
+  try {
+    if ('caches' in window) caches.open('bp-meta')
+      .then(function (c) { return c.match('push-ok'); })
+      .then(function (r) { return r ? r.text() : ''; })
+      .then(function (t) {
+        var n = Number(t) || 0;
+        if (n > pushAt) { pushAt = n; tell({ bp: 'pushok', at: n }); }
+      }).catch(function () {});
+  } catch (e) {}
+
+  /* Token kyun nahi mila — pehle ye sirf console me jata tha, ab portal
+     ke Test page par dikhta hai */
+  function fail(why) {
+    fcmErr = String(why || '').slice(0, 180);
+    tell({ bp: 'fcmerr', why: fcmErr });
   }
+  function hi() { return { bp: 'wrap', perm: perm(), pushAt: pushAt, fcmErr: fcmErr, ver: WRAP_VER }; }
 
   function perm() { return ('Notification' in window) ? Notification.permission : 'unsupported'; }
   function tell(m) { if (pWin) try { pWin.postMessage(m, pOrigin); } catch (e) {} }
@@ -116,7 +152,10 @@ var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqF
     try {
       if (!firebase.apps.length) firebase.initializeApp(FB);
       var sup = firebase.messaging.isSupported();
-      if (sup === false) return;                       // purana browser / iPhone bina Home Screen
+      if (sup === false) {                             // purana browser / iPhone bina Home Screen
+        fail('This browser cannot receive push (on iPhone: add the app to the Home Screen first)');
+        return;
+      }
       msg = msg || firebase.messaging();
       /* app saamne khuli ho tab Firebase notification khud nahi dikhata \u2014
          hum dikhate hain, taaki har haal me ek jaisi aaye */
@@ -128,9 +167,12 @@ var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqF
         });
       }
       msg.getToken({ vapidKey: VAPID, serviceWorkerRegistration: reg })
-        .then(function (t) { if (t) { fcmToken = t; tell({ bp: 'fcm', token: t }); } })
-        .catch(function (e) { console.log('FCM token nahi mila:', e); });
-    } catch (e) { console.log('FCM:', e); }
+        .then(function (t) {
+          if (t) { fcmToken = t; fcmErr = ''; tell({ bp: 'fcm', token: t }); }
+          else fail('Firebase returned no push address');
+        })
+        .catch(function (e) { console.log('FCM token nahi mila:', e); fail((e && (e.code || e.message)) || e); });
+    } catch (e) { console.log('FCM:', e); fail((e && e.message) || e); }
   }
 
   /* Patti tabhi, jab ijazat abhi maangi nahi aur "Baad me" aaj nahi dabaya */
@@ -171,7 +213,7 @@ var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqF
     pWin = e.source; pOrigin = e.origin;
 
     if (d.bp === 'hello') {
-      tell({ bp: 'wrap', perm: perm() });
+      tell(hi());
       if (fcmToken) tell({ bp: 'fcm', token: fcmToken }); else getFcm();
       bar();
       if (hashNav) { tell({ bp: 'open', nav: hashNav }); hashNav = ''; history.replaceState(null, '', './'); }
@@ -183,7 +225,7 @@ var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqF
   document.getElementById('on').onclick = function () {
     if (!('Notification' in window)) { alert('This browser does not support notifications.'); return; }
     Notification.requestPermission().then(function (p) {
-      tell({ bp: 'perm', perm: p });
+      var m = hi(); m.bp = 'perm'; tell(m);
       bar();
       if (p === 'granted') getFcm();
       if (p === 'granted') show([{ title: 'Notifications are on',
