@@ -52,7 +52,7 @@ body.ask #bar{display:flex}
   <button id="on" type="button">Turn on</button>
   <button id="later" type="button">Later</button>
 </div>
-<iframe id="app" title="Bright Paper Portal" allow="clipboard-write"></iframe>
+<iframe id="app" title="Bright Paper Portal" allow="clipboard-write; autoplay"></iframe>
 <div id="setup">
   <h3 style="margin-top:0">The portal address is not set yet</h3>
   In this file (<code>index.html</code>), replace <code>PORTAL</code> near the top with
@@ -94,7 +94,7 @@ var FB = {
 var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqFO7Pk6vGimSKCDTOQkYyw';
 
 /* Is app ka version — portal ke "Test notifications" page par dikhta hai */
-var WRAP_VER = '22Sep-05';
+var WRAP_VER = '16Oct-01';
 
 (function () {
   var frame = document.getElementById('app');
@@ -197,6 +197,10 @@ var WRAP_VER = '22Sep-05';
     list.slice(0, 6).forEach(function (x) {
       var opt = { body: x.body || '', icon: 'icon-192.png', badge: 'icon-192.png',
                   tag: x.tag || undefined, renotify: !!x.tag, data: { nav: x.nav || '' } };
+      if (x.nav === 'remind') {                 /* 16Oct-01: reminder zor se */
+        opt.vibrate = [400, 150, 400, 150, 400, 600, 400, 150, 400, 150, 400];
+        opt.requireInteraction = true;
+      }
       if (reg && reg.showNotification) { reg.showNotification(x.title || 'Bright Paper', opt); return; }
       try {                                   /* purana browser, bina service worker */
         var n = new Notification(x.title || 'Bright Paper', opt);
