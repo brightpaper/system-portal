@@ -94,7 +94,7 @@ var FB = {
 var VAPID = 'BHdwjja2q6x9QyLljCvp2-Ov93GGiCrhKVctQvgYQe0gD9mvwo0lZJnob27pQrqDPqFO7Pk6vGimSKCDTOQkYyw';
 
 /* Is app ka version — portal ke "Test notifications" page par dikhta hai */
-var WRAP_VER = '16Oct-01';
+var WRAP_VER = '16Oct-02';
 
 (function () {
   var frame = document.getElementById('app');
@@ -226,6 +226,17 @@ var WRAP_VER = '16Oct-01';
     }
     if (d.bp === 'notify') { badge(d.badge || 0); show(d.list); }
     if (d.bp === 'badge')  badge(d.n || 0);
+    /* 16Oct-02: portal me ghanti padh li \u2014 patti se purani notification hatao */
+    if (d.bp === 'clear') {
+      badge(0);
+      try {
+        var rr = reg || null;
+        (rr ? Promise.resolve(rr) : navigator.serviceWorker.ready).then(function (r) {
+          return r.getNotifications();
+        }).then(function (ns) { (ns || []).forEach(function (n) { n.close(); }); })
+          .catch(function () {});
+      } catch (x) {}
+    }
   });
 
   document.getElementById('on').onclick = function () {
